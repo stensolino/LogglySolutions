@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore;
+﻿using Loggly;
+using Loggly.Config;
+using LogglySolutions.Api.Settings;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -21,6 +24,11 @@ namespace LogglySolutions.Api
                         .AddJsonFile($"appsettings.{_environmentName}.json", optional: true, reloadOnChange: true)
                         .Build();
 
+            var logglySettings = new LogglySettings();
+            configuration.GetSection("Serilog:Loggly").Bind(logglySettings);
+
+            SetupLogglyConfiguration(logglySettings);
+
             Log.Logger = new LoggerConfiguration()
                 .ReadFrom.Configuration(configuration)
                 .CreateLogger();
@@ -38,5 +46,26 @@ namespace LogglySolutions.Api
                 })
                 .UseStartup<Startup>()
                 .Build();
+
+        private static void SetupLogglyConfiguration(LogglySettings logglySettings)
+        {
+            //Configure Loggly
+            var config = LogglyConfig.Instance;
+            config.CustomerToken = logglySettings.CustomerToken;
+            config.ApplicationName = logglySettings.ApplicationName;
+            config.Transport = new TransportConfiguration()
+            {
+                EndpointHostname = logglySettings.EndpointHostname,
+                EndpointPort = logglySettings.EndpointPort,
+                LogTransport = logglySettings.LogTransport
+            };
+            config.ThrowExceptions = logglySettings.ThrowExceptions;
+
+            //Define Tags sent to Loggly
+            config.TagConfig.Tags.AddRange(new ITag[]{
+                new ApplicationNameTag {Formatter = "Application-{0}"},
+                new HostnameTag { Formatter = "Host-{0}" }
+            });
+        }
     }
 }
